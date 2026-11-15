@@ -23,6 +23,8 @@ Your notes and settings live in `%APPDATA%\DriveNotes`. Updating = quit DriveNot
 | Aa button | Formatting: Title, Heading, Body, bold, italic, underline, strikethrough, lists |
 | Ctrl+B / I / U, Ctrl+Shift+X | Bold / italic / underline / strikethrough |
 | `- `, `1. `, `[] ` at line start | Bulleted list / numbered list / checklist |
+| Ctrl+Shift+V | Paste without formatting |
+| Right-click a word | Spelling suggestions |
 | Ctrl+F | Search |
 | Esc / close / minimize | Hide to the tray icon (keeps running). Turn on **Settings → Show in taskbar** to minimize to the taskbar instead. Quit from Settings or the tray icon |
 

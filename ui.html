@@ -262,7 +262,8 @@ function inl(node) {
     if (/^(S|STRIKE|DEL)$/.test(n) || td.includes('line-through')) t = `<s>${t}</s>`;
     if (n === 'U' || (td.includes('underline') && n !== 'A')) t = `<u>${t}</u>`;
     if (/^(I|EM)$/.test(n) || st.fontStyle === 'italic') t = `<i>${t}</i>`;
-    if (/^(B|STRONG)$/.test(n) || +st.fontWeight >= 600 || st.fontWeight === 'bold') t = `<b>${t}</b>`;
+    const fw = st.fontWeight, notBold = fw === 'normal' || (fw && +fw < 600);
+    if ((/^(B|STRONG)$/.test(n) && !notBold) || +fw >= 600 || fw === 'bold' || fw === 'bolder') t = `<b>${t}</b>`;
     if (isBlockEl(c) && c.nextSibling) t += '<br>';
     o += t;
   }
@@ -285,6 +286,9 @@ function blocksHTML(root) {
   let o = '', pend = document.createElement('span');
   const flush = () => { const t = inl(pend); if (t.replace(/<br>/g, '').trim() || t === '<br>') o += `<p>${t}</p>`; pend = document.createElement('span'); };
   for (const c of [...root.childNodes]) {
+    if (c.nodeType === 1 && !isBlockEl(c) && c.querySelector('p,div,h1,h2,h3,h4,h5,h6,ul,ol,li,table,blockquote,pre')) {
+      flush(); o += blocksHTML(c); continue; // e.g. Google Docs' <b id="docs-internal-guid…"> wrapper
+    }
     if (isBlockEl(c)) {
       flush();
       if (c.nodeName === 'UL' || c.nodeName === 'OL') o += listHTML(c);
@@ -529,14 +533,62 @@ ed.addEventListener('click', e => {
   const b = blockOf(r.startContainer), bx = b && boxAt(b);
   if (bx && r.startContainer === bx.t && r.startOffset <= bx.i + 1) toggleCheckAt(b);
 });
+// ---- clipboard ----
+// Pasted web/Docs/Word HTML: collapse source-code whitespace (the editor keeps
+// spaces literally) unless the source itself marked text as preformatted.
+function collapseWhitespace(root) {
+  const keep = n => { for (let e = n.parentElement; e; e = e.parentElement) { if (e.nodeName === 'PRE' || /pre/.test(e.style?.whiteSpace || '')) return true; } return false; };
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); const ts = [];
+  while (w.nextNode()) ts.push(w.currentNode);
+  for (const t of ts) if (!keep(t)) t.data = t.data.replace(/[ \t\n\r\f]+/g, ' ');
+}
+const tidy = h => h.replace(/<(p|h1|h2|h3|li)>[ ]+/g, '<$1>').replace(/[ ]+<\/(p|h1|h2|h3|li)>/g, '</$1>').replace(/<br>[ ]+/g, '<br>').replace(/<(p|h1|h2|h3|li)><\/\1>/g, '<$1><br></$1>');
+function pasteHTML(html) {
+  const d = new DOMParser().parseFromString(html, 'text/html');
+  d.querySelectorAll('style,script,meta,title,link').forEach(n => n.remove());
+  collapseWhitespace(d.body);
+  return canon(tidy(blocksHTML(d.body)));
+}
+function insertPasted(out) {
+  if (!out) return;
+  // A single paragraph goes into the current line instead of splitting it.
+  const one = /^<p>((?:(?!<\/?p>|<\/?h\d>|<\/?[uo]l>).)*)<\/p>$/s.exec(out);
+  if (one) document.execCommand('insertHTML', false, one[1]);
+  else document.execCommand('insertHTML', false, out);
+}
+let plainPaste = false; // Ctrl+Shift+V pastes without formatting
+ed.addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'v') plainPaste = true; });
 ed.addEventListener('paste', e => {
   e.preventDefault();
   const h = e.clipboardData.getData('text/html'), t = e.clipboardData.getData('text/plain');
-  let out;
-  if (h) { const d = new DOMParser().parseFromString(h, 'text/html'); out = canon(blocksHTML(d.body)); }
-  else out = t.replace(/\r/g, '').split('\n').map(l => `<p>${esc(l) || '<br>'}</p>`).join('');
-  if (out) document.execCommand('insertHTML', false, out);
+  const plainOnly = plainPaste; plainPaste = false;
+  if (h && !plainOnly) { insertPasted(pasteHTML(h)); return; }
+  const lines = t.replace(/\r\n?/g, '\n').replace(/\n$/, '').split('\n');
+  if (lines.length === 1) document.execCommand('insertText', false, lines[0]);
+  else insertPasted(lines.map(l => `<p>${esc(l) || '<br>'}</p>`).join(''));
 });
+// Copy/cut: one line per line in plain text (no blank line after every
+// paragraph), clean formatting in HTML.
+function plainOf(html) {
+  tpl.innerHTML = html; const out = [];
+  for (const el of tpl.content.querySelectorAll('p,h1,h2,h3,li')) {
+    if (el.querySelector('p,h1,h2,h3,li')) continue;
+    let pre = '';
+    if (el.nodeName === 'LI') { const L = el.parentElement; pre = L && L.nodeName === 'OL' ? ([...L.children].indexOf(el) + 1) + '. ' : '• '; }
+    out.push(pre + el.textContent);
+  }
+  return out.join('\n');
+}
+function copySel(e) {
+  const s = getSelection(); if (!s.rangeCount || s.isCollapsed || !ed.contains(s.anchorNode)) return false;
+  const box = document.createElement('div'); box.appendChild(s.getRangeAt(0).cloneContents());
+  const html = canon(blocksHTML(box));
+  e.clipboardData.setData('text/html', html);
+  e.clipboardData.setData('text/plain', plainOf(html));
+  e.preventDefault(); return true;
+}
+ed.addEventListener('copy', copySel);
+ed.addEventListener('cut', e => { if (copySel(e)) { document.execCommand('delete'); onEdit(); } });
 
 // ---- formatting panel ----
 function fmt(cmd) { ed.focus(); document.execCommand(cmd); onEdit(); syncFmt(); }

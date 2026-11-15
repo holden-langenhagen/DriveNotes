@@ -114,8 +114,9 @@ func NewWithOptions(options WebViewOptions) WebView {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// disable context menu
-	err = settings.PutAreDefaultContextMenusEnabled(options.Debug)
+	// DriveNotes patch: keep the built-in context menu so spelling suggestions
+	// work in the editor; the page itself suppresses it everywhere else.
+	err = settings.PutAreDefaultContextMenusEnabled(true)
 	if err != nil {
 		log.Fatal(err)
 	}

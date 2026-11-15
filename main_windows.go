@@ -505,7 +505,7 @@ const wmTray = 0x8000 + 1    // WM_APP+1
 const wmVersion = 0x8000 + 2 // WM_APP+2
 
 // appVersion is compared between running copies (1.5 -> 150).
-const appVersion = 162
+const appVersion = 163
 
 var pSendMessageTimeoutW = user32.NewProc("SendMessageTimeoutW")
 
