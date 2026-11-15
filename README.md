@@ -3,9 +3,14 @@
 A tiny macOS-Notes-style notes app for Windows that syncs every note to Google Drive as a Google Doc
 (folder **DriveNotes**), so you can edit notes from the Google Docs app on your phone.
 
-## Run
-Double-click `DriveNotes.exe`. No install. (Unsigned app: if SmartScreen appears, click **More info → Run anyway**.)
-Data lives in `%APPDATA%\DriveNotes`.
+## Download & run
+1. Go to **[Releases](https://github.com/holden-langenhagen/DriveNotes/releases/latest)** and download `DriveNotes.zip`.
+2. Unzip it and move `DriveNotes.exe` somewhere permanent (e.g. Documents). Don't run it from inside the zip.
+3. Double-click it. No install needed. Windows 10/11 (64-bit).
+   The app isn't code-signed, so SmartScreen may say "Windows protected your PC": click **More info → Run anyway**.
+   Prefer not to trust a downloaded exe? [Build it yourself](#build-it-yourself) — it takes about two minutes.
+
+Your notes and settings live in `%APPDATA%\DriveNotes`. Updating = quit DriveNotes (tray icon → Quit) and replace the exe.
 
 ## Shortcuts
 | Keys | Action |
@@ -37,12 +42,29 @@ Data lives in `%APPDATA%\DriveNotes`.
 * Formatting (titles, headings, bold, italic, underline, strikethrough, lists) syncs both ways with Google Docs.
   Fonts, colors, images and tables added in Docs are simplified.
 
-## Build (from any OS)
+## Build it yourself
+You only need [Go](https://go.dev/dl/) (1.26 or newer). No C compiler, no Visual Studio.
+
+**On Windows (PowerShell):**
+```powershell
+git clone https://github.com/holden-langenhagen/DriveNotes.git
+cd DriveNotes
+go run ./tools/genres
+go build -trimpath -ldflags "-s -w -H windowsgui" -o DriveNotes.exe .
 ```
-go run ./tools/genres          # icon + manifest resource
+(No git? Use **Code → Download ZIP** on GitHub, unzip, and run the last three lines in that folder.)
+
+**On macOS / Linux** (cross-compiles a Windows exe):
+```bash
+go run ./tools/genres
 GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -H windowsgui" -o DriveNotes.exe .
-go test .                      # sync engine tests
 ```
+
+* `go run ./tools/genres` embeds the icon and the Windows manifest (crisp text on high-DPI screens). Skip it and the app still works, just with a default icon.
+* `-H windowsgui` stops a console window from opening; `-trimpath -s -w` keeps the exe small and free of your local paths.
+* Run the tests with `go test .`.
+
+**Official builds** are made by GitHub Actions from this exact source ([workflow](.github/workflows/release.yml)): pushing a tag like `v1.5.2` builds the exe, runs the tests and attaches `DriveNotes.zip` to a release. You can also run it by hand from the **Actions** tab (**Build & release → Run workflow**).
 
 ## Privacy & security
 * **No secrets in this repo or the exe.** Each user creates their own Google OAuth client; its ID/secret are entered in the app and never compiled in.
