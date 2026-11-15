@@ -26,7 +26,7 @@ func main() {
 	rs := winres.ResourceSet{}
 	rs.SetIcon(winres.ID(1), icon)
 	rs.SetManifest(winres.AppManifest{
-		Identity:            winres.AssemblyIdentity{Name: "DriveNotes", Version: [4]uint16{1, 6, 3, 0}},
+		Identity:            winres.AssemblyIdentity{Name: "DriveNotes", Version: [4]uint16{1, 6, 4, 0}},
 		Description:         "DriveNotes",
 		Compatibility:       winres.Win10AndAbove,
 		ExecutionLevel:      winres.AsInvoker,
@@ -34,8 +34,8 @@ func main() {
 		UseCommonControlsV6: true,
 	})
 	v := version.Info{}
-	v.SetFileVersion("1.6.3.0")
-	v.SetProductVersion("1.6.3.0")
+	v.SetFileVersion("1.6.4.0")
+	v.SetProductVersion("1.6.4.0")
 	_ = v.Set(version.LangDefault, version.ProductName, "DriveNotes")
 	_ = v.Set(version.LangDefault, version.FileDescription, "DriveNotes")
 	_ = v.Set(version.LangDefault, version.OriginalFilename, "DriveNotes.exe")

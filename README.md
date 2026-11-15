@@ -37,7 +37,8 @@ Your notes and settings live in `%APPDATA%\DriveNotes`. Updating = quit DriveNot
 6. On "Google hasn't verified this app" click **Advanced → Go to DriveNotes** (it's your own app).
 
 ## Sync behaviour
-* Pushes ~2 s after you stop typing, pulls every 30 s and whenever you open the window.
+* Pushes ~2 s after you stop typing and pulls the moment you open the window.
+* Battery-friendly background checks: every 30 s while the window is open (60 s on battery), every 5 min while hidden (15 min on battery or Battery Saver).
 * Works offline; syncs when back online.
 * If the same note is edited on both phone and PC between syncs, both versions are kept.
 * Deleting a note moves its Doc to Drive trash.

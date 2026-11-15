@@ -166,6 +166,7 @@ func main() {
 	if a.cfg.Token != nil {
 		a.connectDrive()
 	}
+	a.sync.Interval = a.syncInterval
 	go a.sync.Loop()
 	go a.hotkeyLoop()
 
@@ -505,7 +506,7 @@ const wmTray = 0x8000 + 1    // WM_APP+1
 const wmVersion = 0x8000 + 2 // WM_APP+2
 
 // appVersion is compared between running copies (1.5 -> 150).
-const appVersion = 163
+const appVersion = 164
 
 var pSendMessageTimeoutW = user32.NewProc("SendMessageTimeoutW")
 
@@ -622,5 +623,40 @@ func (a *App) applyTaskbar(on bool) {
 	if vis != 0 {
 		pShowWindow.Call(a.hwnd, swShow)
 		a.setOnTop(a.cfg.OnTop)
+	}
+}
+
+// ---------- battery-friendly sync pace ----------
+
+var pGetSystemPowerStatus = windows.NewLazySystemDLL("kernel32.dll").NewProc("GetSystemPowerStatus")
+
+// onBattery reports running on battery or with Battery Saver on.
+func onBattery() bool {
+	var ps struct {
+		ACLineStatus, BatteryFlag, BatteryLifePercent, SystemStatusFlag uint8
+		BatteryLifeTime, BatteryFullLifeTime                            uint32
+	}
+	if r, _, _ := pGetSystemPowerStatus.Call(uintptr(unsafe.Pointer(&ps))); r == 0 {
+		return false
+	}
+	return ps.ACLineStatus == 0 || ps.SystemStatusFlag == 1
+}
+
+// syncInterval: poll often only while the window is on screen. Opening the
+// window and editing always trigger an immediate sync anyway.
+func (a *App) syncInterval() time.Duration {
+	vis, _, _ := pIsWindowVisible.Call(a.hwnd)
+	min, _, _ := pIsIconic.Call(a.hwnd)
+	shown := vis != 0 && min == 0
+	bat := onBattery()
+	switch {
+	case shown && !bat:
+		return 30 * time.Second
+	case shown:
+		return 60 * time.Second
+	case !bat:
+		return 5 * time.Minute
+	default:
+		return 15 * time.Minute
 	}
 }

@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 )
 
 // fakeDrive mimics Google Docs: stores text, bumps versions, and on export adds
@@ -224,3 +227,68 @@ func TestMigratePlainText(t *testing.T) {
 		t.Fatal(g)
 	}
 }
+
+// countingRemote counts sync cycles (each starts with EnsureFolder).
+type countingRemote struct {
+	*fakeDrive
+	n chan struct{}
+}
+
+func (c countingRemote) EnsureFolder(k string) (string, bool, error) {
+	c.n <- struct{}{}
+	return c.fakeDrive.EnsureFolder(k)
+}
+
+func TestLoopFollowsIntervalAndKick(t *testing.T) {
+	dir, _ := os.MkdirTemp("", "drivenotes-loop") // Loop keeps running after the test
+	st := OpenStore(filepath.Join(dir, "d.json"))
+	sy := NewSyncer(st)
+	var slow atomicBool
+	sy.Interval = func() time.Duration {
+		if slow.get() {
+			return time.Hour
+		}
+		return 20 * time.Millisecond
+	}
+	cr := countingRemote{newFake(), make(chan struct{}, 100)}
+	sy.mu.Lock()
+	sy.remote = cr
+	sy.mu.Unlock()
+	go sy.Loop()
+	for i := 0; i < 3; i++ { // fast pace: several polls quickly
+		select {
+		case <-cr.n:
+		case <-time.After(2 * time.Second):
+			t.Fatal("fast interval did not poll")
+		}
+	}
+	slow.set(true)
+	time.Sleep(100 * time.Millisecond)
+	for len(cr.n) > 0 {
+		<-cr.n
+	}
+	select { // slow pace: no polling...
+	case <-cr.n:
+		// one cycle may already have been scheduled with the fast pace
+		select {
+		case <-cr.n:
+			t.Fatal("still polling fast after switching to slow")
+		case <-time.After(300 * time.Millisecond):
+		}
+	case <-time.After(300 * time.Millisecond):
+	}
+	sy.Kick() // ...but a kick (window shown / edit) syncs right away
+	select {
+	case <-cr.n:
+	case <-time.After(3 * time.Second):
+		t.Fatal("kick did not sync while on the slow pace")
+	}
+}
+
+type atomicBool struct {
+	mu sync.Mutex
+	v  bool
+}
+
+func (b *atomicBool) get() bool  { b.mu.Lock(); defer b.mu.Unlock(); return b.v }
+func (b *atomicBool) set(v bool) { b.mu.Lock(); b.v = v; b.mu.Unlock() }

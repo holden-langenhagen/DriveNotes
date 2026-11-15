@@ -31,8 +31,9 @@ type Syncer struct {
 	mu       sync.Mutex
 	remote   Remote
 	kick     chan struct{}
-	OnChange func()              // local notes changed by sync
-	OnStatus func(status string) // human-readable status
+	Interval func() time.Duration // polling pace; nil = every 30s
+	OnChange func()               // local notes changed by sync
+	OnStatus func(status string)  // human-readable status
 }
 
 func NewSyncer(store *Store) *Syncer {
@@ -53,18 +54,25 @@ func (s *Syncer) Kick() {
 	}
 }
 
-// Loop syncs after local edits (debounced) and every 30s.
+// Loop syncs shortly after local edits or a Kick (e.g. the window being
+// shown), and otherwise polls Drive at the pace Interval returns, which is
+// re-read every cycle so it follows visibility and power state.
 func (s *Syncer) Loop() {
-	tick := time.NewTicker(30 * time.Second)
 	for {
+		d := 30 * time.Second
+		if s.Interval != nil {
+			d = s.Interval()
+		}
+		t := time.NewTimer(d)
 		select {
 		case <-s.kick:
+			t.Stop()
 			time.Sleep(1500 * time.Millisecond)
 			select { // collapse kicks that arrived during the debounce
 			case <-s.kick:
 			default:
 			}
-		case <-tick.C:
+		case <-t.C:
 		}
 		s.SyncNow()
 	}
