@@ -12,7 +12,15 @@ A tiny macOS-Notes-style notes app for Windows that syncs every note to Google D
 
 Your notes and settings live in `%APPDATA%\DriveNotes`. Updating = quit DriveNotes (tray icon → Quit) and replace the exe.
 
-## Shortcuts
+## Uninstall
+Deleting `DriveNotes.exe` does **not** remove your notes or settings. To remove DriveNotes completely:
+1. Quit it: right-click the tray icon → **Quit DriveNotes**.
+2. If you turned on **Launch when Windows starts**, turn it off in Settings first (or remove *DriveNotes* under Task Manager → Startup apps).
+3. Delete `DriveNotes.exe` and `WebView2Loader.dll`.
+4. Delete the data folder: press **Win+R**, enter `%APPDATA%\DriveNotes`, and delete that whole folder (`C:\Users\<you>\AppData\Roaming\DriveNotes`). It holds all your notes (`notes.json`), your settings and Google sign-in (`config.json`) and the display engine's cache.
+5. Optional: your synced notes also live as Google Docs in the **DriveNotes** folder of your Google Drive. Delete that folder there if you want them gone too, and remove the app's access at https://myaccount.google.com/permissions.
+
+
 | Keys | Action |
 |---|---|
 | Ctrl+Alt+N | Show / hide from anywhere |
