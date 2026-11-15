@@ -26,7 +26,7 @@ func main() {
 	rs := winres.ResourceSet{}
 	rs.SetIcon(winres.ID(1), icon)
 	rs.SetManifest(winres.AppManifest{
-		Identity:            winres.AssemblyIdentity{Name: "DriveNotes", Version: [4]uint16{1, 0, 0, 0}},
+		Identity:            winres.AssemblyIdentity{Name: "DriveNotes", Version: [4]uint16{1, 6, 2, 0}},
 		Description:         "DriveNotes",
 		Compatibility:       winres.Win10AndAbove,
 		ExecutionLevel:      winres.AsInvoker,
@@ -34,11 +34,15 @@ func main() {
 		UseCommonControlsV6: true,
 	})
 	v := version.Info{}
-	v.SetFileVersion("1.0.0.0")
-	v.SetProductVersion("1.0.0.0")
+	v.SetFileVersion("1.6.2.0")
+	v.SetProductVersion("1.6.2.0")
 	_ = v.Set(version.LangDefault, version.ProductName, "DriveNotes")
 	_ = v.Set(version.LangDefault, version.FileDescription, "DriveNotes")
 	_ = v.Set(version.LangDefault, version.OriginalFilename, "DriveNotes.exe")
+	_ = v.Set(version.LangDefault, version.InternalName, "DriveNotes")
+	_ = v.Set(version.LangDefault, version.CompanyName, "DriveNotes (open source)")
+	_ = v.Set(version.LangDefault, version.LegalCopyright, "Open source - github.com/holden-langenhagen/DriveNotes")
+	_ = v.Set(version.LangDefault, version.Comments, "Notes app that syncs with Google Docs")
 	rs.SetVersionInfo(v)
 	out, err := os.Create("rsrc_windows_amd64.syso")
 	if err != nil {

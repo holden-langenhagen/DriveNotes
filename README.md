@@ -77,7 +77,7 @@ New, unsigned apps are sometimes flagged by mistake. DriveNotes avoids the usual
 
 ## Privacy & security
 * **No secrets in this repo or the exe.** Each user creates their own Google OAuth client; its ID/secret are entered in the app and never compiled in.
-* **Credentials are encrypted at rest** with Windows DPAPI (per-user), in `%APPDATA%\DriveNotes\config.json`. A copied config file is useless on another account or PC.
+* **Credentials** (your OAuth client and sign-in token) are stored in `%APPDATA%\DriveNotes\config.json`, inside your Windows user profile, which only your account can read — the same approach Google's own command-line tools use. Disconnect in Settings or revoke access at https://myaccount.google.com/permissions at any time.
 * **Notes** are stored locally in `%APPDATA%\DriveNotes\notes.json` and in your own Google Drive folder `DriveNotes`. Nothing is sent anywhere else — there is no server, telemetry or analytics.
 * **Network:** the app talks only to `accounts.google.com` / `oauth2.googleapis.com` (sign-in) and `www.googleapis.com` (Drive). Sign-in uses PKCE and a one-time loopback listener on `127.0.0.1` with a random `state` check.
 * **No hidden code loading:** the WebView2 library is vendored in `third_party/go-webview2` and patched so it never maps DLLs from memory (see `webviewloader/module.go`).

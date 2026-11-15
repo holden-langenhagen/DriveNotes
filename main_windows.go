@@ -505,7 +505,7 @@ const wmTray = 0x8000 + 1    // WM_APP+1
 const wmVersion = 0x8000 + 2 // WM_APP+2
 
 // appVersion is compared between running copies (1.5 -> 150).
-const appVersion = 161
+const appVersion = 162
 
 var pSendMessageTimeoutW = user32.NewProc("SendMessageTimeoutW")
 
@@ -583,32 +583,6 @@ func (a *App) trayMenu() {
 }
 
 // ---------- hardening ----------
-
-func init() {
-	protect = func(b []byte) ([]byte, error) { return dpapi(b, true) }
-	unprotect = func(b []byte) ([]byte, error) { return dpapi(b, false) }
-}
-
-// dpapi encrypts/decrypts with the current Windows user's key.
-func dpapi(in []byte, encrypt bool) ([]byte, error) {
-	if len(in) == 0 {
-		return in, nil
-	}
-	src := windows.DataBlob{Size: uint32(len(in)), Data: &in[0]}
-	var dst windows.DataBlob
-	var err error
-	const uiForbidden = 0x1
-	if encrypt {
-		err = windows.CryptProtectData(&src, nil, nil, 0, nil, uiForbidden, &dst)
-	} else {
-		err = windows.CryptUnprotectData(&src, nil, nil, 0, nil, uiForbidden, &dst)
-	}
-	if err != nil {
-		return nil, err
-	}
-	defer windows.LocalFree(windows.Handle(unsafe.Pointer(dst.Data)))
-	return append([]byte(nil), unsafe.Slice(dst.Data, dst.Size)...), nil
-}
 
 // navGuard runs before any page script. If the view ever ends up on anything
 // other than the app's own page, cut its bridge to the app and blank it.
