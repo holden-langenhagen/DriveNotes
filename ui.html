@@ -1,0 +1,693 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src 'none'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>DriveNotes</title>
+<style>
+:root {
+  --bg: #fdfcfa; --side: #f6f4f2; --line: #e7e3dd; --text: #1d1b18; --muted: #8a847b;
+  --hover: rgba(0,0,0,.045); --sel: #f8e7b0; --sel-text: #1d1b18; --accent: #d99a00; --accent-soft: #fdf1cf;
+  --input: #ecebe7; --danger: #d6453d; --ok: #3aa55d; --shadow: 0 18px 50px rgba(0,0,0,.18);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #1a1a1a; --side: #1f1f1f; --line: #2e2e2e; --text: #ecebe8; --muted: #8d8a85;
+  --hover: rgba(255,255,255,.05); --sel: #4a3c12; --sel-text: #fff3cf; --accent: #f2b72c; --accent-soft: #3a3013;
+  --input: #2a2a2a; --shadow: 0 18px 50px rgba(0,0,0,.6); color-scheme: dark;
+}}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+  font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; display: block; }
+#app { display: flex; height: 100%; position: relative; }
+
+/* sidebar */
+aside { width: 250px; flex: none; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; transition: margin .18s ease; }
+#app:not(.side-open) aside { margin-left: -251px; }
+.search { padding: 12px 12px 8px; }
+.search input { width: 100%; border: 0; outline: 0; border-radius: 8px; padding: 7px 10px 7px 30px; background: var(--input) no-repeat 9px 50%/14px;
+  color: var(--text); font: inherit; font-size: 13px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238a847b' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E"); }
+#list { flex: 1; overflow-y: auto; padding: 0 8px 8px; }
+#list::-webkit-scrollbar { width: 10px; }
+#list::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+.group { font-size: 11.5px; font-weight: 600; color: var(--muted); padding: 10px 8px 4px; display: flex; align-items: center; gap: 5px; }
+.group svg { width: 12px; height: 12px; }
+.item { padding: 8px 10px; border-radius: 8px; cursor: default; position: relative; }
+.item + .item::before { content: ""; position: absolute; left: 10px; right: 10px; top: 0; border-top: 1px solid var(--line); }
+.item:hover { background: var(--hover); }
+.item.sel, .item.sel + .item::before, .item:hover + .item::before, .item:hover::before { border-color: transparent; }
+.item.sel { background: var(--sel); color: var(--sel-text); }
+.item .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item .s { font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item.sel .s { color: inherit; opacity: .7; }
+.item .s b { font-weight: 500; color: var(--text); margin-right: 6px; }
+.item.sel .s b { color: inherit; }
+#list .empty { color: var(--muted); text-align: center; padding: 30px 10px; font-size: 13px; }
+.foot { display: flex; align-items: center; gap: 4px; padding: 8px 8px 10px; border-top: 1px solid var(--line); }
+.status { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); padding: 6px 8px; border-radius: 7px; text-align: left; min-width: 0; }
+.status:hover { background: var(--hover); }
+.status span:last-child { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.ok { background: var(--ok); } .dot.err { background: var(--danger); }
+.dot.busy { background: var(--accent); animation: pulse 1s infinite alternate; }
+@keyframes pulse { to { opacity: .3; } }
+
+/* main */
+main { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--bg); }
+.bar { height: 46px; flex: none; display: flex; align-items: center; gap: 2px; padding: 0 8px; border-bottom: 1px solid transparent; }
+main.scrolled .bar { border-color: var(--line); }
+.ib { width: 34px; height: 32px; border-radius: 7px; display: grid; place-items: center; color: var(--muted); flex: none; }
+.ib:hover { background: var(--hover); color: var(--text); }
+.ib.on { color: var(--accent); background: var(--accent-soft); }
+.ib:disabled { opacity: .35; pointer-events: none; }
+.sp { flex: 1; }
+.meta { font-size: 12px; color: var(--muted); padding: 0 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
+#ed { flex: 1; overflow-y: auto; outline: 0; color: var(--text); white-space: pre-wrap; word-wrap: break-word; cursor: text;
+  font: 15px/1.6 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; padding: 6px 28px 40px; user-select: text; tab-size: 4; position: relative; }
+#ed[contenteditable="false"] { cursor: default; }
+#ph { position: absolute; left: 28px; top: 52px; pointer-events: none; color: var(--muted); font: 700 25.5px/1.25 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
+#app.narrow #ph { left: 16px; top: 50px; }
+#ed p { margin: 0; }
+#ed h1, #ed > p:first-child, #ed > div:first-child { font-size: 1.7em; line-height: 1.25; margin: .35em 0 .25em; font-weight: 700; }
+#ed h2 { font-size: 1.25em; line-height: 1.3; margin: .6em 0 .2em; font-weight: 650; }
+#ed h3 { font-size: 1.08em; margin: .5em 0 .1em; font-weight: 650; }
+#ed > :first-child, #ed > p:first-child, #ed > h1:first-child, #ed > div:first-child { margin-top: 0; }
+#ed ul, #ed ol { margin: .1em 0; padding-left: 1.6em; }
+#ed li { padding-left: .15em; }
+#ed .done { color: var(--muted); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--muted) 70%, transparent); }
+#ed::-webkit-scrollbar { width: 10px; }
+#ed::-webkit-scrollbar-thumb { background: var(--line); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+#fmt { position: absolute; z-index: 6; top: 46px; right: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+#fmt[hidden] { display: none; }
+.frow { display: flex; gap: 4px; align-items: center; }
+#fmt button { min-width: 36px; height: 34px; padding: 0 10px; border-radius: 8px; color: var(--text); display: grid; place-items: center; font-size: 14px; }
+#fmt button:hover { background: var(--hover); }
+#fmt button.on { background: var(--accent-soft); color: var(--accent); }
+#fmt .fb-title { font-weight: 700; font-size: 16px; } #fmt .fb-head { font-weight: 650; }
+#fmt .frow:first-child button { flex: 1; }
+.fsep { width: 1px; height: 20px; background: var(--line); margin: 0 3px; }
+main { position: relative; }
+  font: 15px/1.6 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; padding: 6px max(24px, calc((100% - 760px) / 2)) 40px; user-select: text; tab-size: 4; }
+::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+
+/* narrow (pinned mini window) */
+#app.narrow aside { position: absolute; z-index: 5; top: 0; bottom: 0; left: 0; }
+#app.narrow.side-open aside { box-shadow: var(--shadow); }
+#app.narrow .meta, #app.narrow .wide-only { display: none; }
+#app.narrow #ed { padding: 4px 16px 30px; }
+#app.narrow #fmt { left: 8px; right: 8px; }
+#scrim { display: none; position: absolute; inset: 0; z-index: 4; background: rgba(0,0,0,.15); }
+#app.narrow.side-open #scrim { display: block; }
+
+/* dialog */
+.modal { position: fixed; inset: 0; z-index: 10; background: rgba(0,0,0,.32); display: grid; place-items: center; padding: 16px; }
+.modal[hidden] { display: none; }
+.card { background: var(--bg); width: min(460px, 100%); max-height: 100%; overflow-y: auto; border-radius: 14px; box-shadow: var(--shadow); padding: 20px 22px; user-select: text; border: 1px solid var(--line); }
+.card h2 { font-size: 17px; margin: 0 0 14px; display: flex; align-items: center; }
+.card h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 8px; }
+.card p, .card li { font-size: 13px; color: var(--muted); margin: 6px 0; }
+.card ol { padding-left: 20px; margin: 6px 0; }
+.card a { color: var(--accent); cursor: pointer; text-decoration: none; font-weight: 600; }
+.field { width: 100%; border: 1px solid var(--line); background: var(--input); color: var(--text); border-radius: 8px; padding: 8px 10px; font: inherit; font-size: 13px; outline: 0; margin: 4px 0; }
+.field:focus { border-color: var(--accent); }
+.btn { border-radius: 8px; padding: 7px 14px; font-weight: 600; font-size: 13px; background: var(--input); }
+.btn:hover { filter: brightness(.95); }
+.btn.primary { background: var(--accent); color: #1d1b18; }
+.btn.danger { color: var(--danger); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+.toggle { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; font-size: 13.5px; }
+.toggle input { width: 36px; height: 20px; appearance: none; background: var(--line); border-radius: 20px; position: relative; cursor: pointer; transition: .15s; margin: 0; flex: none; }
+.toggle input::after { content: ""; position: absolute; width: 16px; height: 16px; top: 2px; left: 2px; background: #fff; border-radius: 50%; transition: .15s; box-shadow: 0 1px 2px rgba(0,0,0,.3); }
+.toggle input:checked { background: var(--accent); } .toggle input:checked::after { left: 18px; }
+kbd { font: 12px "Segoe UI", sans-serif; background: var(--input); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; color: var(--text); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; color: var(--muted); align-items: center; }
+.err { color: var(--danger) !important; }
+.connected { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+details summary { cursor: pointer; font-size: 13px; font-weight: 600; margin: 4px 0; }
+#toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 9px; font-size: 13px; opacity: 0; transition: .2s; pointer-events: none; z-index: 20; }
+#toast.show { opacity: 1; transform: translateX(-50%); }
+</style>
+</head>
+<body>
+<div id="app" class="side-open">
+  <aside>
+    <div class="search"><input id="search" placeholder="Search" spellcheck="false"></div>
+    <div id="list"></div>
+    <div class="foot">
+      <button class="status" id="statusBtn" title="Sync now"><span class="dot" id="dot"></span><span id="statusText">Local only</span></button>
+      <button class="ib" id="settingsBtn" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    </div>
+  </aside>
+  <div id="scrim"></div>
+  <main id="main">
+    <div class="bar">
+      <button class="ib" id="sideBtn" title="Show notes list (Ctrl+\)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></svg></button>
+      <button class="ib" id="newBtn" title="New note (Ctrl+N)"><svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
+      <div class="sp"></div>
+      <span class="meta" id="meta"></span>
+ <button class="ib" id="fmtBtn" title="Formatting"><span style="font:600 15px 'Segoe UI',sans-serif;letter-spacing:-.02em">Aa</span></button>
+      <button class="ib" id="checkBtn" title="Checklist line (Ctrl+L)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><path d="m4.5 17 2 2 3.5-4"/><path d="M14 7.5h7M14 17h7"/></svg></button>
+      <button class="ib" id="starBtn" title="Pin note to top of list (Ctrl+Shift+P)"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/></svg></button>
+      <button class="ib wide-only" id="docBtn" title="Open in Google Docs"><svg viewBox="0 0 24 24"><path d="M14 4h6v6"/><path d="M20 4 11 13"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4"/></svg></button>
+      <button class="ib wide-only" id="delBtn" title="Delete note"><svg viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg></button>
+      <div class="sep"></div>
+      <button class="ib" id="topBtn" title="Keep window on top (Ctrl+T)"><svg viewBox="0 0 24 24"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3Z"/><path d="M12 14v6"/></svg></button>
+    </div>
+    <div id="fmt" hidden>
+      <div class="frow">
+        <button data-block="h1" class="fb-title" title="Title (Ctrl+Shift+1)">Title</button>
+        <button data-block="h2" class="fb-head" title="Heading (Ctrl+Shift+2)">Heading</button>
+        <button data-block="p" title="Body (Ctrl+Shift+0)">Body</button>
+      </div>
+      <div class="frow">
+        <button data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button data-cmd="italic" title="Italic (Ctrl+I)"><i style="font-family:Georgia,serif">I</i></button>
+        <button data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+        <button data-cmd="strikeThrough" title="Strikethrough (Ctrl+Shift+X)"><s>S</s></button>
+        <span class="fsep"></span>
+        <button data-cmd="insertUnorderedList" title="Bulleted list (Ctrl+Shift+8)"><svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1" fill="currentColor"/><circle cx="4.5" cy="12" r="1" fill="currentColor"/><circle cx="4.5" cy="18" r="1" fill="currentColor"/></svg></button>
+        <button data-cmd="insertOrderedList" title="Numbered list (Ctrl+Shift+7)"><svg viewBox="0 0 24 24"><path d="M10 6h10M10 12h10M10 18h10"/><path d="M4 5l1.2-.8V9M3.8 9h2.6" stroke-width="1.4"/><path d="M3.8 14.2c.3-.6 1-.9 1.6-.6.7.3.8 1.1.3 1.6l-1.9 1.9h2.6" stroke-width="1.4"/></svg></button>
+        <button id="fmtCheck" title="Checklist (Ctrl+L)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="7" rx="1.5"/><path d="m4.5 17 2 2 3.5-4"/><path d="M14 7.5h7M14 17h7"/></svg></button>
+      </div>
+    </div>
+    <div id="ed" contenteditable="true" spellcheck="true" data-ph="Start typing…"></div>
+    <div id="ph" aria-hidden="true">Start typing…</div>
+  </main>
+
+  <div class="modal" id="settings" hidden>
+    <div class="card">
+      <h2>Settings <span class="sp"></span><button class="ib" id="closeSettings" title="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></h2>
+
+      <h3>Google Drive</h3>
+      <div id="driveOn" hidden>
+        <div class="connected"><span class="dot ok"></span><span>Connected <span id="email"></span></span></div>
+        <p>Notes live in the <b>DriveNotes</b> folder of your Drive as Google Docs. Edit them from the Google Docs app on your phone; changes appear here within ~30 seconds.</p>
+        <div class="row">
+          <button class="btn" id="openFolder">Open Drive folder</button>
+          <button class="btn" id="syncNow">Sync now</button>
+          <button class="btn danger" id="disconnect">Disconnect</button>
+        </div>
+      </div>
+      <div id="driveOff">
+        <p>One-time setup (about 3 minutes). Google requires each personal app to have its own sign-in key.</p>
+        <details id="howto">
+          <summary>How to get your Client ID & secret</summary>
+          <ol>
+            <li>Open <a data-url="https://console.cloud.google.com/projectcreate">Google Cloud → New project</a>, name it “DriveNotes”, Create.</li>
+            <li><a data-url="https://console.cloud.google.com/apis/library/drive.googleapis.com">Enable the Google Drive API</a> for that project.</li>
+            <li>Open <a data-url="https://console.cloud.google.com/auth/overview">Google Auth Platform</a> → Get started. App name “DriveNotes”, your email, Audience <b>External</b>, Create.</li>
+            <li>Go to <b>Audience</b> → click <b>Publish app</b> (keeps you signed in; otherwise Google logs you out every 7 days).</li>
+            <li>Go to <a data-url="https://console.cloud.google.com/auth/clients">Clients</a> → Create client → type <b>Desktop app</b> → Create. Copy the Client ID and secret here.</li>
+          </ol>
+          <p>When signing in, Google shows “Google hasn't verified this app” — that's your own app, so click <b>Advanced → Go to DriveNotes</b>.</p>
+        </details>
+        <input class="field" id="cid" placeholder="Client ID  (or paste the downloaded JSON)" spellcheck="false">
+        <input class="field" id="csec" placeholder="Client secret" spellcheck="false" type="password">
+        <div class="row"><button class="btn primary" id="connect">Connect Google Drive</button><span id="connMsg" style="font-size:13px;color:var(--muted)"></span></div>
+      </div>
+
+      <h3>General</h3>
+      <label class="toggle">Launch when Windows starts (hidden) <input type="checkbox" id="startup"></label>
+      <label class="toggle">Keep window on top <input type="checkbox" id="ontopChk"></label>
+
+      <h3>Shortcuts</h3>
+      <div class="keys">
+        <span><kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>N</kbd></span><span id="hkText">Show / hide DriveNotes from anywhere</span>
+        <span><kbd>Ctrl</kbd> <kbd>N</kbd></span><span>New note</span>
+        <span><kbd>Ctrl</kbd> <kbd>T</kbd></span><span>Keep window on top</span>
+        <span><kbd>Ctrl</kbd> <kbd>B</kbd> / <kbd>I</kbd> / <kbd>U</kbd></span><span>Bold / italic / underline</span>
+        <span><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>X</kbd></span><span>Strikethrough</span>
+        <span><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>1</kbd> / <kbd>2</kbd> / <kbd>0</kbd></span><span>Title / heading / body</span>
+        <span><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>8</kbd> / <kbd>7</kbd></span><span>Bulleted / numbered list</span>
+        <span><kbd>Ctrl</kbd> <kbd>L</kbd></span><span>Toggle checklist on line</span>
+        <span><kbd>Ctrl</kbd> <kbd>Enter</kbd></span><span>Tick / untick checklist item</span>
+        <span><kbd>Ctrl</kbd> <kbd>F</kbd></span><span>Search notes</span>
+        <span><kbd>Ctrl</kbd> <kbd>\</kbd></span><span>Show / hide notes list</span>
+        <span><kbd>Esc</kbd></span><span>Minimize to taskbar (keeps running)</span>
+      </div>
+      <div class="row" style="margin-top:18px"><button class="btn danger" id="quit">Quit DriveNotes</button></div>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const ed = $('#ed'), app = $('#app'), list = $('#list');
+const api = new Proxy({}, { get: (_, k) => (...a) => (window['api_' + k] ? window['api_' + k](...a) : Promise.resolve()) });
+let notes = [], cur = null, saveTimer = null, S = {};
+const BOX = '☐', DONE = '☑';
+document.execCommand('defaultParagraphSeparator', false, 'p');
+
+// ---- HTML helpers (notes are stored as a small HTML subset) ----
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const BLOCKS = { P: 'p', DIV: 'p', H1: 'h1', H2: 'h2', H3: 'h3', H4: 'h3', H5: 'h3', H6: 'h3', BLOCKQUOTE: 'p', PRE: 'p' };
+const isBlockEl = n => n.nodeType === 1 && (BLOCKS[n.nodeName] || /^(UL|OL|LI|TABLE|TBODY|THEAD|TR|TD|TH)$/.test(n.nodeName));
+function inl(node) {
+  let o = '';
+  for (const c of node.childNodes) {
+    if (c.nodeType === 3) { o += esc(c.data.replace(/ /g, ' ')); continue; }
+    if (c.nodeType !== 1) continue;
+    if (c.nodeName === 'BR') { o += '<br>'; continue; }
+    if (/^(STYLE|SCRIPT|IMG|META)$/.test(c.nodeName)) continue;
+    let t = inl(c); if (!t) continue;
+    const st = c.style || {}, n = c.nodeName, td = (st.textDecorationLine || st.textDecoration || '');
+    if (/^(S|STRIKE|DEL)$/.test(n) || td.includes('line-through')) t = `<s>${t}</s>`;
+    if (n === 'U' || (td.includes('underline') && n !== 'A')) t = `<u>${t}</u>`;
+    if (/^(I|EM)$/.test(n) || st.fontStyle === 'italic') t = `<i>${t}</i>`;
+    if (/^(B|STRONG)$/.test(n) || +st.fontWeight >= 600 || st.fontWeight === 'bold') t = `<b>${t}</b>`;
+    if (isBlockEl(c) && c.nextSibling) t += '<br>';
+    o += t;
+  }
+  return o;
+}
+function listHTML(el) {
+  const tag = el.nodeName === 'OL' ? 'ol' : 'ul'; let o = `<${tag}>`;
+  for (const c of el.childNodes) {
+    if (c.nodeType !== 1) { if (c.nodeType === 3 && c.data.trim()) o += `<li>${esc(c.data)}</li>`; continue; }
+    if (c.nodeName === 'UL' || c.nodeName === 'OL') { o += listHTML(c); continue; }
+    const tmp = document.createElement('span'), nested = [];
+    for (const cc of c.childNodes) {
+      if (cc.nodeName === 'UL' || cc.nodeName === 'OL') nested.push(cc); else tmp.appendChild(cc.cloneNode(true));
+    }
+    o += `<li>${inl(tmp) || '<br>'}${nested.map(listHTML).join('')}</li>`;
+  }
+  return o + `</${tag}>`;
+}
+function blocksHTML(root) {
+  let o = '', pend = document.createElement('span');
+  const flush = () => { const t = inl(pend); if (t.replace(/<br>/g, '').trim() || t === '<br>') o += `<p>${t}</p>`; pend = document.createElement('span'); };
+  for (const c of [...root.childNodes]) {
+    if (isBlockEl(c)) {
+      flush();
+      if (c.nodeName === 'UL' || c.nodeName === 'OL') o += listHTML(c);
+      else if ([...c.childNodes].some(isBlockEl)) o += blocksHTML(c);
+      else { const tag = BLOCKS[c.nodeName] || 'p'; o += `<${tag}>${inl(c) || '<br>'}</${tag}>`; }
+    } else pend.appendChild(c.cloneNode(true));
+  }
+  flush();
+  return o;
+}
+function canon(h) {
+  h = h.trim().replace(/<\/(b|i|u|s)><\1>/g, '');
+  while (h.endsWith('<p><br></p>')) h = h.slice(0, -11).trim();
+  return h;
+}
+// The first line of a note is always its title.
+const sanitize = root => canon(blocksHTML(root)).replace(/^<p>([\s\S]*?)<\/p>/, '<h1>$1</h1>');
+const tpl = document.createElement('template');
+const lineCache = new Map();
+function linesOf(h) {
+  if (lineCache.has(h)) return lineCache.get(h);
+  tpl.innerHTML = h;
+  const ls = [...tpl.content.querySelectorAll('p,h1,h2,h3,li')].filter(e => !e.querySelector('p,h1,h2,h3,li')).map(e => e.textContent.replace(/ /g, ' '));
+  if (lineCache.size > 500) lineCache.clear();
+  lineCache.set(h, ls); return ls;
+}
+const plain = h => linesOf(h).join('\n');
+const titleOf = b => { for (const l of linesOf(b)) { const t = l.replace(/^[\s#☐☑•\-*]+/, '').trim(); if (t) return t; } return 'New note'; };
+const previewOf = b => { const ls = linesOf(b).map(l => l.trim()).filter(Boolean); return ls[1] || 'No additional text'; };
+const isEmpty = b => !plain(b || '').trim();
+
+function when(ms) {
+  const d = new Date(ms), now = new Date();
+  if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Yesterday';
+  if (now - d < 6 * 864e5) return d.toLocaleDateString([], { weekday: 'long' });
+  return d.toLocaleDateString();
+}
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 1800); }
+
+function sorted() { return [...notes].sort((a, b) => (b.pinned - a.pinned) || (b.updated - a.updated)); }
+function render() {
+  const q = $('#search').value.trim().toLowerCase();
+  const vis = sorted().filter(n => !q || plain(n.body).toLowerCase().includes(q));
+  const pin = vis.filter(n => n.pinned), rest = vis.filter(n => !n.pinned);
+  const item = n => `<div class="item${cur && n.id === cur.id ? ' sel' : ''}" data-id="${n.id}"><div class="t">${esc(titleOf(n.body))}</div><div class="s"><b>${when(n.updated)}</b>${esc(previewOf(n.body))}</div></div>`;
+  let h = '';
+  if (pin.length) h += `<div class="group"><svg viewBox="0 0 24 24"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9Z"/></svg>Pinned</div>` + pin.map(item).join('');
+  if (rest.length) h += (pin.length ? `<div class="group">Notes</div>` : '') + rest.map(item).join('');
+  list.innerHTML = h || `<div class="empty">${q ? 'No matching notes' : 'No notes yet'}</div>`;
+  renderBar();
+}
+function renderBar() {
+  $('#starBtn').classList.toggle('on', !!(cur && cur.pinned));
+  $('#docBtn').disabled = !(cur && cur.driveId);
+  $('#delBtn').disabled = !cur;
+  $('#fmtBtn').disabled = !cur;
+  $('#meta').textContent = cur ? when(cur.updated) : '';
+  $('#topBtn').classList.toggle('on', !!S.onTop);
+}
+
+function flushSave() {
+  if (!saveTimer) return Promise.resolve();
+  clearTimeout(saveTimer); saveTimer = null;
+  return api.save(cur.id, cur.body);
+}
+window.flushSave = flushSave;
+
+function setEditor(html) {
+  ed.innerHTML = html || '<p><br></p>';
+  markChecks(); updateEmpty();
+}
+// An empty note always puts the cursor at the start of the title line,
+// however focus arrives (click anywhere, window shown, new note).
+function caretToStart() {
+  if (!ed.firstElementChild) ed.innerHTML = '<p><br></p>';
+  const f = ed.firstElementChild, t = firstText(f), r = document.createRange();
+  if (t) r.setStart(t, 0); else r.setStart(f, 0);
+  r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+function focusStart() { ed.focus({ preventScroll: true }); if (ed.classList.contains('is-empty')) caretToStart(); }
+ed.addEventListener('mousedown', e => { if (cur && ed.classList.contains('is-empty')) { e.preventDefault(); ed.focus({ preventScroll: true }); caretToStart(); } });
+ed.addEventListener('focus', () => { if (ed.classList.contains('is-empty')) caretToStart(); });
+function updateEmpty() { const e = !ed.textContent.trim() && !ed.querySelector('li'); ed.classList.toggle('is-empty', e); $('#ph').hidden = !e; $('#ph').textContent = ed.dataset.ph; }
+
+async function select(id, focus) {
+  await flushSave();
+  const prev = cur;
+  cur = notes.find(n => n.id === id) || null;
+  if (prev && prev !== cur && isEmpty(prev.body)) { notes = notes.filter(n => n !== prev); api.delete(prev.id); }
+  // Drop focus before swapping content: Edge on Windows otherwise keeps painting
+  // the caret where it was in the previous note.
+  const hadFocus = ed.contains(document.activeElement) || document.activeElement === ed;
+  getSelection().removeAllRanges(); if (hadFocus) ed.blur();
+  setEditor(cur ? cur.body : '');
+  ed.contentEditable = cur ? 'true' : 'false';
+  ed.dataset.ph = cur ? 'Start typing…' : 'Press Ctrl+N to create a note';
+  updateEmpty();
+  ed.scrollTop = 0;
+  api.prefs(cur ? cur.id : '', app.classList.contains('narrow') ? S.sidebarOpen !== false : app.classList.contains('side-open'));
+  render();
+  if (app.classList.contains('narrow')) setSide(false);
+  if (focus && cur) {
+    const put = () => { if (ed.classList.contains('is-empty')) focusStart(); else { ed.focus(); placeCaret(ed, Infinity); } };
+    put(); requestAnimationFrame(() => requestAnimationFrame(() => { ed.blur(); put(); })); // re-place after paint
+  }
+}
+
+async function newNote() {
+  if (cur && isEmpty(cur.body)) { ed.focus(); return; }
+  $('#search').value = '';
+  const n = await api.new();
+  notes.push(n);
+  await select(n.id, true);
+}
+
+function onEdit() {
+  if (!cur) return;
+  if (!ed.firstElementChild && !ed.textContent) caretToStart();
+  else if (!ed.firstElementChild || [...ed.childNodes].some(n => n.nodeType === 3 && n.data.trim())) document.execCommand('formatBlock', false, 'p');
+  cur.body = sanitize(ed); cur.updated = Date.now();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => { saveTimer = null; api.save(cur.id, cur.body); }, 400);
+  markChecks(); updateEmpty(); render();
+}
+ed.addEventListener('scroll', () => $('#main').classList.toggle('scrolled', ed.scrollTop > 2));
+
+// ---- caret helpers ----
+function caretIn(el) {
+  const s = getSelection(); if (!s.rangeCount || !el.contains(s.anchorNode)) return null;
+  const r = document.createRange(); r.selectNodeContents(el); r.setEnd(s.anchorNode, s.anchorOffset);
+  return r.toString().length;
+}
+function placeCaret(el, off) {
+  const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT); let n, last = null;
+  while ((n = w.nextNode())) { last = n; if (off <= n.data.length) break; off -= n.data.length; }
+  const r = document.createRange();
+  if (n) r.setStart(n, Math.max(0, off)); else if (last) r.setStart(last, last.data.length); else r.setStart(el.querySelector('p,h1,h2,h3,li') || el, 0);
+  r.collapse(true); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+const BLOCK_SEL = /^(P|H1|H2|H3|LI|DIV)$/;
+function blockOf(node) {
+  while (node && node !== ed) { if (node.nodeType === 1 && BLOCK_SEL.test(node.nodeName)) return node; node = node.parentNode; }
+  return null;
+}
+function curBlock() {
+  let b = blockOf(getSelection().anchorNode);
+  if (!b && ed.contains(getSelection().anchorNode)) { document.execCommand('formatBlock', false, 'p'); b = blockOf(getSelection().anchorNode); }
+  return b;
+}
+function firstText(b) { const w = document.createTreeWalker(b, NodeFilter.SHOW_TEXT); let n; while ((n = w.nextNode())) if (n.data.length) return n; return null; }
+
+// ---- checklists ----
+function markChecks() { ed.querySelectorAll('p,li,h1,h2,h3').forEach(b => b.classList.toggle('done', /^\s*☑/.test(b.textContent))); }
+function boxAt(b) { const t = firstText(b); if (!t) return null; const i = t.data.search(/\S/); return i >= 0 && (t.data[i] === BOX || t.data[i] === DONE) ? { t, i } : null; }
+function toggleCheckAt(b) {
+  const bx = b && boxAt(b); if (!bx) return false;
+  const keep = caretIn(b);
+  const r = document.createRange(); r.setStart(bx.t, bx.i); r.setEnd(bx.t, bx.i + 1);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+  document.execCommand('insertText', false, bx.t.data[bx.i] === BOX ? DONE : BOX);
+  if (keep != null) placeCaret(b, keep);
+  return true;
+}
+function selectedBlocks() {
+  const s = getSelection(); if (!s.rangeCount) return [];
+  if (s.isCollapsed) { const b = curBlock(); return b ? [b] : []; }
+  const r = s.getRangeAt(0);
+  return [...ed.querySelectorAll('p,h1,h2,h3,li,div')].filter(e => !e.querySelector('p,h1,h2,h3,li,div') && r.intersectsNode(e));
+}
+function toggleChecklist() {
+  ed.focus();
+  const bs = selectedBlocks(); if (!bs.length) return;
+  const all = bs.every(b => boxAt(b) || !b.textContent.trim());
+  for (const b of bs) {
+    const bx = boxAt(b), s = getSelection(), r = document.createRange();
+    if (all && bx) {
+      const len = bx.t.data[bx.i + 1] === ' ' ? 2 : 1;
+      r.setStart(bx.t, bx.i); r.setEnd(bx.t, bx.i + len); s.removeAllRanges(); s.addRange(r);
+      document.execCommand('delete');
+    } else if (!all && !bx) {
+      const t = firstText(b); if (t) r.setStart(t, 0); else r.setStart(b, 0);
+      r.collapse(true); s.removeAllRanges(); s.addRange(r);
+      document.execCommand('insertText', false, BOX + ' ');
+    }
+  }
+  placeCaret(bs[bs.length - 1], Infinity);
+}
+let pendingBox = false;
+ed.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); toggleCheckAt(curBlock()); return; }
+  if (e.key === 'Enter' && !e.shiftKey) {
+    const b = curBlock(), bx = b && boxAt(b);
+    if (bx && b.nodeName !== 'LI') {
+      if (b.textContent.trim().length <= 1) { // empty checklist item ends the list
+        e.preventDefault(); const r = document.createRange(); r.selectNodeContents(b);
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.execCommand('delete'); return;
+      }
+      pendingBox = true;
+    }
+  }
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    if (blockOf(getSelection().anchorNode)?.nodeName === 'LI') document.execCommand(e.shiftKey ? 'outdent' : 'indent');
+    else document.execCommand('insertText', false, '\t');
+  }
+  if (e.ctrlKey && !e.altKey) {
+    if (e.shiftKey && k === 'x') { e.preventDefault(); fmt('strikeThrough'); }
+    else if (e.shiftKey && (e.code === 'Digit8')) { e.preventDefault(); fmt('insertUnorderedList'); }
+    else if (e.shiftKey && (e.code === 'Digit7')) { e.preventDefault(); fmt('insertOrderedList'); }
+    else if (e.shiftKey && e.code === 'Digit1') { e.preventDefault(); block('h1'); }
+    else if (e.shiftKey && e.code === 'Digit2') { e.preventDefault(); block('h2'); }
+    else if (e.shiftKey && e.code === 'Digit0') { e.preventDefault(); block('p'); }
+  }
+});
+ed.addEventListener('input', e => {
+  if (e.inputType === 'insertParagraph' && pendingBox) { pendingBox = false; document.execCommand('insertText', false, BOX + ' '); return; }
+  pendingBox = false;
+  if (e.inputType === 'insertText' && e.data === ' ') { // markdown-style shortcuts at line start
+    const b = curBlock();
+    if (b && b.nodeName !== 'LI') {
+      const t = b.textContent, off = caretIn(b);
+      const m = /^(- |\* |• |1\. |\[\] |\[ \] )$/.exec(t.slice(0, off));
+      if (m && off === m[1].length) {
+        const r = document.createRange(), ft = firstText(b);
+        if (ft && ft.data.length >= off) {
+          r.setStart(ft, 0); r.setEnd(ft, off); const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+          const p = m[1];
+          if (p.startsWith('[')) document.execCommand('insertText', false, BOX + ' ');
+          else { document.execCommand('delete'); document.execCommand(p === '1. ' ? 'insertOrderedList' : 'insertUnorderedList'); }
+        }
+      }
+    }
+  }
+  onEdit();
+});
+ed.addEventListener('click', e => {
+  const r = document.caretRangeFromPoint && document.caretRangeFromPoint(e.clientX, e.clientY);
+  if (!r || !getSelection().isCollapsed) return;
+  const b = blockOf(r.startContainer), bx = b && boxAt(b);
+  if (bx && r.startContainer === bx.t && r.startOffset <= bx.i + 1) toggleCheckAt(b);
+});
+ed.addEventListener('paste', e => {
+  e.preventDefault();
+  const h = e.clipboardData.getData('text/html'), t = e.clipboardData.getData('text/plain');
+  let out;
+  if (h) { const d = new DOMParser().parseFromString(h, 'text/html'); out = canon(blocksHTML(d.body)); }
+  else out = t.replace(/\r/g, '').split('\n').map(l => `<p>${esc(l) || '<br>'}</p>`).join('');
+  if (out) document.execCommand('insertHTML', false, out);
+});
+
+// ---- formatting panel ----
+function fmt(cmd) { ed.focus(); document.execCommand(cmd); onEdit(); syncFmt(); }
+function block(tag) {
+  ed.focus();
+  const curTag = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+  document.execCommand('formatBlock', false, curTag === tag ? 'p' : tag);
+  onEdit(); syncFmt();
+}
+function syncFmt() {
+  if (!ed.contains(getSelection().anchorNode)) return;
+  const tag = (document.queryCommandValue('formatBlock') || '').toLowerCase();
+  document.querySelectorAll('#fmt [data-cmd]').forEach(b => b.classList.toggle('on', document.queryCommandState(b.dataset.cmd)));
+  const first = blockOf(getSelection().anchorNode) === ed.firstElementChild;
+  document.querySelectorAll('#fmt [data-block]').forEach(b => b.classList.toggle('on', b.dataset.block === (first || tag === 'h1' ? 'h1' : tag === 'h2' ? 'h2' : 'p')));
+  const cb = blockOf(getSelection().anchorNode);
+  $('#fmtCheck').classList.toggle('on', !!(cb && boxAt(cb)));
+}
+document.addEventListener('selectionchange', () => { if (!$('#fmt').hidden) syncFmt(); });
+$('#fmt').addEventListener('mousedown', e => e.preventDefault()); // keep the text selection
+$('#fmt').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.cmd) fmt(b.dataset.cmd);
+  else if (b.dataset.block) block(b.dataset.block);
+  else if (b.id === 'fmtCheck') { toggleChecklist(); syncFmt(); }
+});
+function toggleFmt(show) {
+  const p = $('#fmt'); p.hidden = show === undefined ? !p.hidden : !show;
+  $('#fmtBtn').classList.toggle('on', !p.hidden);
+  if (!p.hidden) { if (!ed.contains(getSelection().anchorNode)) { ed.focus(); } syncFmt(); }
+}
+$('#fmtBtn').addEventListener('mousedown', e => e.preventDefault());
+$('#fmtBtn').onclick = () => toggleFmt();
+
+// ---- sidebar / layout ----
+function setSide(open) { app.classList.toggle('side-open', open); if (!app.classList.contains('narrow')) { S.sidebarOpen = open; api.prefs(cur ? cur.id : '', open); } }
+function layout() { const n = innerWidth < 600; if (n !== app.classList.contains('narrow')) { app.classList.toggle('narrow', n); if (n) app.classList.remove('side-open'); else app.classList.toggle('side-open', S.sidebarOpen !== false); } }
+addEventListener('resize', layout);
+$('#sideBtn').onclick = () => setSide(!app.classList.contains('side-open'));
+$('#scrim').onclick = () => setSide(false);
+list.addEventListener('click', e => { const it = e.target.closest('.item'); if (it) select(it.dataset.id, true); });
+$('#search').addEventListener('input', render);
+$('#search').addEventListener('keydown', e => { if (e.key === 'Enter') { const f = list.querySelector('.item'); if (f) select(f.dataset.id, true); } if (e.key === 'Escape') { e.stopPropagation(); e.target.value = ''; render(); ed.focus(); } });
+
+// ---- toolbar ----
+$('#newBtn').onclick = newNote;
+$('#checkBtn').addEventListener('mousedown', e => e.preventDefault());
+$('#checkBtn').onclick = () => cur && toggleChecklist();
+async function toggleStar() { if (!cur) return; await flushSave(); cur.pinned = !cur.pinned; cur.updated = Date.now(); api.pin(cur.id, cur.pinned); render(); toast(cur.pinned ? 'Pinned to top' : 'Unpinned'); }
+$('#starBtn').onclick = toggleStar;
+$('#docBtn').onclick = () => cur && cur.driveId && api.openDoc(cur.driveId);
+$('#delBtn').onclick = async () => {
+  if (!cur) return;
+  if (!isEmpty(cur.body) && !confirm(`Delete “${titleOf(cur.body)}”?` + (S.connected ? '\n\nIt will also move to your Google Drive trash.' : ''))) return;
+  clearTimeout(saveTimer); saveTimer = null;
+  const id = cur.id; notes = notes.filter(n => n.id !== id); api.delete(id); cur = null;
+  const next = sorted()[0]; await select(next ? next.id : null, true);
+};
+function setOnTop(on) { S.onTop = on; api.setOnTop(on); $('#ontopChk').checked = on; renderBar(); toast(on ? 'Window stays on top' : 'Window no longer on top'); }
+$('#topBtn').onclick = () => setOnTop(!S.onTop);
+$('#ontopChk').onchange = e => setOnTop(e.target.checked);
+
+// ---- settings ----
+function openSettings() { $('#settings').hidden = false; }
+function closeSettings() { $('#settings').hidden = true; ed.focus(); }
+$('#settingsBtn').onclick = openSettings;
+$('#closeSettings').onclick = closeSettings;
+$('#settings').addEventListener('mousedown', e => { if (e.target.id === 'settings') closeSettings(); });
+document.querySelectorAll('[data-url]').forEach(a => a.onclick = () => api.open(a.dataset.url));
+$('#cid').addEventListener('input', e => {
+  const v = e.target.value.trim(); if (!v.startsWith('{')) return;
+  try { const j = JSON.parse(v), c = j.installed || j.web || j; if (c.client_id) { e.target.value = c.client_id; $('#csec').value = c.client_secret || ''; } } catch {}
+});
+$('#connect').onclick = () => {
+  const id = $('#cid').value.trim(), sec = $('#csec').value.trim();
+  if (!id.endsWith('.apps.googleusercontent.com')) { $('#connMsg').className = 'err'; $('#connMsg').textContent = 'That doesn’t look like a Client ID.'; return; }
+  $('#connMsg').className = ''; $('#connMsg').textContent = 'Finish signing in in your browser…';
+  api.connect(id, sec);
+};
+window.onConnected = email => { S.connected = true; if (email) S.email = email; $('#connMsg').textContent = ''; driveUI(); toast('Google Drive connected'); };
+window.onConnectError = msg => { $('#connMsg').className = 'err'; $('#connMsg').textContent = msg; };
+$('#disconnect').onclick = () => { if (!confirm('Disconnect Google Drive? Your notes stay on this PC and in Drive.')) return; api.disconnect(); S.connected = false; S.email = ''; driveUI(); };
+$('#openFolder').onclick = async () => { const u = await api.folderUrl(); if (u) api.open(u); };
+$('#syncNow').onclick = () => api.syncNow();
+$('#statusBtn').onclick = () => S.connected ? api.syncNow() : (openSettings(), $('#howto').open = true);
+$('#startup').onchange = async e => { try { e.target.checked = await api.setStartup(e.target.checked); } catch (err) { toast('Could not change startup setting'); } };
+window.quitApp = async () => { await flushSave(); api.quit(); };
+$('#quit').onclick = window.quitApp;
+window.onOnTop = on => { S.onTop = on; $('#ontopChk').checked = on; renderBar(); };
+function driveUI() {
+  $('#driveOn').hidden = !S.connected; $('#driveOff').hidden = !!S.connected;
+  $('#email').textContent = S.email ? 'as ' + S.email : '';
+  if (!S.connected) onStatus('local');
+}
+window.onStatus = s => {
+  const dot = $('#dot'), t = $('#statusText'), b = $('#statusBtn');
+  dot.className = 'dot'; b.title = 'Sync now';
+  if (s === 'local' || !S.connected && !s.startsWith('synced')) { t.textContent = 'Connect Google Drive'; b.title = 'Set up sync'; }
+  else if (s === 'syncing') { dot.classList.add('busy'); t.textContent = 'Syncing…'; }
+  else if (s.startsWith('synced:')) { dot.classList.add('ok'); t.textContent = 'Synced ' + s.slice(7); }
+  else if (s.startsWith('error:')) { dot.classList.add('err'); t.textContent = navigator.onLine ? 'Sync problem — retrying' : 'Offline — saved locally'; b.title = s.slice(6); }
+};
+window.onHotkey = ok => { if (!ok) $('#hkText').innerHTML = '<span class="err">Unavailable — another app is using Ctrl+Alt+N</span>'; };
+window.onNotesChanged = async () => {
+  const fresh = await api.list(); if (!fresh) return;
+  const editing = !!saveTimer;
+  notes = fresh.map(n => (editing && cur && n.id === cur.id) ? Object.assign(n, { body: cur.body }) : n);
+  const was = cur; cur = cur ? notes.find(n => n.id === cur.id) || null : null;
+  if (cur && !editing && sanitize(ed) !== cur.body) {
+    const off = caretIn(ed), st = ed.scrollTop;
+    setEditor(cur.body); ed.scrollTop = st;
+    if (off != null) placeCaret(ed, off);
+  }
+  if (was && !cur) { const n = sorted()[0]; await select(n ? n.id : null); return; }
+  render();
+};
+window.focusEditor = () => { if ($('#settings').hidden && cur) { if (ed.classList.contains('is-empty')) { ed.blur(); requestAnimationFrame(focusStart); } else ed.focus(); } };
+
+// ---- global keys ----
+document.addEventListener('keydown', e => {
+  const k = e.key.toLowerCase();
+  if (e.ctrlKey && !e.altKey) {
+    if (k === 'n') { e.preventDefault(); newNote(); }
+    else if (k === 'f') { e.preventDefault(); setSide(true); $('#search').focus(); $('#search').select(); }
+    else if (k === 'l') { e.preventDefault(); cur && toggleChecklist(); }
+    else if (k === 't') { e.preventDefault(); setOnTop(!S.onTop); }
+    else if (k === 'p' && e.shiftKey) { e.preventDefault(); toggleStar(); }
+    else if (k === '\\') { e.preventDefault(); setSide(!app.classList.contains('side-open')); }
+    else if (k === 'w' || k === 'p' || k === 'r' || k === 'o') e.preventDefault();
+  }
+  if (e.key === 'Escape') {
+    if (!$('#settings').hidden) closeSettings();
+    else if (!$('#fmt').hidden) toggleFmt(false);
+    else if (app.classList.contains('narrow') && app.classList.contains('side-open')) setSide(false);
+    else api.hide();
+  }
+});
+// Never let a dropped link/file navigate the app window; text drops into a note are fine.
+addEventListener('dragover', e => { if (!ed.contains(e.target) || e.dataTransfer.types.includes('Files')) { e.preventDefault(); e.dataTransfer.dropEffect = 'none'; } });
+addEventListener('drop', e => { if (!ed.contains(e.target) || e.dataTransfer.types.includes('Files')) e.preventDefault(); });
+document.addEventListener('contextmenu', e => { if (!ed.contains(e.target) && !e.target.matches('input')) e.preventDefault(); });
+
+// ---- boot ----
+(async () => {
+  S = (await api.init()) || { notes: [] };
+  notes = S.notes || [];
+  $('#startup').checked = !!S.startup; $('#ontopChk').checked = !!S.onTop;
+  if (S.clientId) $('#cid').value = S.clientId;
+  app.classList.toggle('side-open', S.sidebarOpen !== false);
+  layout(); driveUI(); onStatus(S.status || 'local');
+  const first = notes.find(n => n.id === S.lastNote) || sorted()[0];
+  await select(first ? first.id : null, true);
+})();
+</script>
+</body>
+</html>
