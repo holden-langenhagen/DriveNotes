@@ -28,9 +28,10 @@ jobs:
       - name: Build Windows exe
         run: |
           go run ./tools/genres
-          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -H windowsgui" -o DriveNotes.exe .
-          zip DriveNotes.zip DriveNotes.exe README.md
-          sha256sum DriveNotes.exe DriveNotes.zip > SHA256SUMS.txt
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-H windowsgui" -o DriveNotes.exe .
+          cp third_party/go-webview2/webviewloader/sdk/x64/WebView2Loader.dll .
+          zip DriveNotes.zip DriveNotes.exe WebView2Loader.dll README.md
+          sha256sum DriveNotes.exe WebView2Loader.dll DriveNotes.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Publish release
@@ -38,7 +39,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
-          NOTES="Download **DriveNotes.zip**, unzip, and run DriveNotes.exe (Windows 10/11, 64-bit). Built by GitHub Actions from commit $GITHUB_SHA. SHA-256 checksums are in SHA256SUMS.txt."
+          NOTES="Download **DriveNotes.zip**, unzip, keep DriveNotes.exe and WebView2Loader.dll together, and run DriveNotes.exe (Windows 10/11, 64-bit). Built by GitHub Actions from commit $GITHUB_SHA. SHA-256 checksums are in SHA256SUMS.txt."
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && gh release view "$TAG" >/dev/null 2>&1; then
             # Manual run for an existing version: rebuild it from the current code.
             gh release delete "$TAG" --cleanup-tag --yes

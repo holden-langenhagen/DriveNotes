@@ -114,6 +114,13 @@ func main() {
 	if dpi == 0 {
 		dpi = 96
 	}
+	if exe, err := os.Executable(); err == nil {
+		if _, err := os.Stat(filepath.Join(filepath.Dir(exe), "WebView2Loader.dll")); err != nil {
+			msgBox("WebView2Loader.dll is missing.\n\nKeep DriveNotes.exe and WebView2Loader.dll together in the same folder " +
+				"(unzip both from DriveNotes.zip), then start DriveNotes again.")
+			return
+		}
+	}
 	a.w = webview2.NewWithOptions(webview2.WebViewOptions{
 		DataPath:  filepath.Join(a.dir, "webview"),
 		AutoFocus: true,
@@ -479,7 +486,7 @@ const wmTray = 0x8000 + 1    // WM_APP+1
 const wmVersion = 0x8000 + 2 // WM_APP+2
 
 // appVersion is compared between running copies (1.5 -> 150).
-const appVersion = 152
+const appVersion = 160
 
 var pSendMessageTimeoutW = user32.NewProc("SendMessageTimeoutW")
 

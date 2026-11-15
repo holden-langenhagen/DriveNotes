@@ -12,7 +12,8 @@ require (
 
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
-	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
 	golang.org/x/image v0.12.0 // indirect
 )
+
+replace github.com/jchv/go-webview2 => ./third_party/go-webview2
