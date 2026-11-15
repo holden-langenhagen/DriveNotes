@@ -64,6 +64,7 @@ type App struct {
 	sync           *Syncer
 	quitting       bool
 	taskbarCreated uintptr
+	owner          uintptr // hidden owner window: owned windows get no taskbar button
 	hotkeyOK       bool
 	status         string
 }
@@ -136,7 +137,11 @@ func main() {
 	}
 	a.hwnd = uintptr(a.w.Window())
 	if hidden {
-		pShowWindow.Call(a.hwnd, swMinNoActive)
+		if a.cfg.Taskbar {
+			pShowWindow.Call(a.hwnd, swMinNoActive)
+		} else {
+			pShowWindow.Call(a.hwnd, swHide)
+		}
 	}
 	a.w.SetSize(int(300*dpi/96), int(220*dpi/96), webview2.HintMin)
 	if r := a.cfg.Rect; r[2] > 200 && r[3] > 150 {
@@ -144,6 +149,7 @@ func main() {
 	}
 	a.applyTheme()
 	a.setOnTop(a.cfg.OnTop)
+	a.applyTaskbar(a.cfg.Taskbar)
 	gwlpWndProc := ^uintptr(3) // -4
 	a.oldProc, _, _ = pSetWindowLongPtrW.Call(a.hwnd, gwlpWndProc, windows.NewCallback(a.wndProc))
 
@@ -180,6 +186,10 @@ func (a *App) eval(fn string, args ...any) {
 }
 
 func (a *App) wndProc(hwnd, msg, wp, lp uintptr) uintptr {
+	if msg == 0x0112 && wp&0xFFF0 == 0xF020 && !a.cfg.Taskbar { // WM_SYSCOMMAND/SC_MINIMIZE
+		a.hide()
+		return 0
+	}
 	if msg == wmVersion { // another copy started: hand over if it is newer
 		if wp > appVersion {
 			a.eval("quitApp")
@@ -220,7 +230,11 @@ func (a *App) saveRect() {
 func (a *App) hide() {
 	a.eval("flushSave")
 	a.saveRect()
-	pShowWindow.Call(a.hwnd, swMinimize) // stays on the taskbar
+	if a.cfg.Taskbar {
+		pShowWindow.Call(a.hwnd, swMinimize) // stays on the taskbar
+	} else {
+		pShowWindow.Call(a.hwnd, swHide) // tray icon only
+	}
 	a.sync.Kick()
 }
 
@@ -361,6 +375,7 @@ type uiState struct {
 	LastNote    string   `json:"lastNote"`
 	SidebarOpen bool     `json:"sidebarOpen"`
 	FolderURL   string   `json:"folderUrl"`
+	Taskbar     bool     `json:"taskbar"`
 }
 
 func (a *App) bind() {
@@ -377,7 +392,7 @@ func (a *App) bind() {
 			w.Dispatch(func() { a.eval("onHotkey", a.hotkeyOK) })
 		})
 		return uiState{a.store.List(), a.cfg.OnTop, a.cfg.Token != nil, a.cfg.Email, a.cfg.ClientID,
-			a.hotkeyOK, startupEnabled(), a.status, a.cfg.LastNote, sb, fu}
+			a.hotkeyOK, startupEnabled(), a.status, a.cfg.LastNote, sb, fu, a.cfg.Taskbar}
 	})
 	w.Bind("api_list", a.store.List)
 	w.Bind("api_new", a.store.New)
@@ -390,6 +405,10 @@ func (a *App) bind() {
 	w.Bind("api_setOnTop", func(on bool) {
 		a.setOnTop(on)
 		a.cfg.Update(func(c *Config) { c.OnTop = on })
+	})
+	w.Bind("api_setTaskbar", func(on bool) {
+		a.cfg.Update(func(c *Config) { c.Taskbar = on })
+		a.applyTaskbar(on)
 	})
 	w.Bind("api_setStartup", func(on bool) (bool, error) {
 		err := setStartup(on)
@@ -486,7 +505,7 @@ const wmTray = 0x8000 + 1    // WM_APP+1
 const wmVersion = 0x8000 + 2 // WM_APP+2
 
 // appVersion is compared between running copies (1.5 -> 150).
-const appVersion = 160
+const appVersion = 161
 
 var pSendMessageTimeoutW = user32.NewProc("SendMessageTimeoutW")
 
@@ -600,3 +619,34 @@ const navGuard = `(function(){
   document.addEventListener('DOMContentLoaded', function(){ document.documentElement.innerHTML = ''; });
   location.replace('about:blank');
 })();`
+
+// ---------- taskbar button ----------
+
+var pCreateWindowExW = user32.NewProc("CreateWindowExW")
+
+// applyTaskbar shows or removes the window's taskbar button. A window owned by
+// a hidden window has no taskbar button but keeps its normal title bar.
+func (a *App) applyTaskbar(on bool) {
+	if a.owner == 0 {
+		var hinst windows.Handle
+		_ = windows.GetModuleHandleEx(0, nil, &hinst)
+		a.owner, _, _ = pCreateWindowExW.Call(0, uintptr(unsafe.Pointer(utf16("STATIC"))), 0, 0, 0, 0, 0, 0, 0, 0, uintptr(hinst), 0)
+	}
+	if m, _, _ := pIsIconic.Call(a.hwnd); m != 0 && !on {
+		pShowWindow.Call(a.hwnd, swRestore)
+	}
+	vis, _, _ := pIsWindowVisible.Call(a.hwnd)
+	if vis != 0 {
+		pShowWindow.Call(a.hwnd, swHide) // the taskbar only re-checks on show
+	}
+	owner := a.owner
+	if on {
+		owner = 0
+	}
+	gwlpHwndParent := ^uintptr(7) // -8
+	pSetWindowLongPtrW.Call(a.hwnd, gwlpHwndParent, owner)
+	if vis != 0 {
+		pShowWindow.Call(a.hwnd, swShow)
+		a.setOnTop(a.cfg.OnTop)
+	}
+}

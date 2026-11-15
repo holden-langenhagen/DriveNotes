@@ -24,7 +24,7 @@ Your notes and settings live in `%APPDATA%\DriveNotes`. Updating = quit DriveNot
 | Ctrl+B / I / U, Ctrl+Shift+X | Bold / italic / underline / strikethrough |
 | `- `, `1. `, `[] ` at line start | Bulleted list / numbered list / checklist |
 | Ctrl+F | Search |
-| Esc / close button | Minimize to taskbar (keeps running). Quit from Settings or the tray icon |
+| Esc / close / minimize | Hide to the tray icon (keeps running). Turn on **Settings → Show in taskbar** to minimize to the taskbar instead. Quit from Settings or the tray icon |
 
 ## Connect Google Drive (one time, ~3 min)
 1. https://console.cloud.google.com/projectcreate → project "DriveNotes".

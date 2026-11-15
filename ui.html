@@ -214,6 +214,8 @@ details summary { cursor: pointer; font-size: 13px; font-weight: 600; margin: 4p
       <h3>General</h3>
       <label class="toggle">Launch when Windows starts (hidden) <input type="checkbox" id="startup"></label>
       <label class="toggle">Keep window on top <input type="checkbox" id="ontopChk"></label>
+      <label class="toggle">Show in taskbar <input type="checkbox" id="taskbarChk"></label>
+      <p style="margin-top:0">Off: DriveNotes lives only in the tray icon by the clock when hidden.</p>
 
       <h3>Shortcuts</h3>
       <div class="keys">
@@ -228,7 +230,7 @@ details summary { cursor: pointer; font-size: 13px; font-weight: 600; margin: 4p
         <span><kbd>Ctrl</kbd> <kbd>Enter</kbd></span><span>Tick / untick checklist item</span>
         <span><kbd>Ctrl</kbd> <kbd>F</kbd></span><span>Search notes</span>
         <span><kbd>Ctrl</kbd> <kbd>\</kbd></span><span>Show / hide notes list</span>
-        <span><kbd>Esc</kbd></span><span>Minimize to taskbar (keeps running)</span>
+        <span><kbd>Esc</kbd></span><span id="escText">Hide to tray (keeps running)</span>
       </div>
       <div class="row" style="margin-top:18px"><button class="btn danger" id="quit">Quit DriveNotes</button></div>
     </div>
@@ -620,6 +622,7 @@ $('#disconnect').onclick = () => { if (!confirm('Disconnect Google Drive? Your n
 $('#openFolder').onclick = async () => { const u = await api.folderUrl(); if (u) api.open(u); };
 $('#syncNow').onclick = () => api.syncNow();
 $('#statusBtn').onclick = () => S.connected ? api.syncNow() : (openSettings(), $('#howto').open = true);
+$('#taskbarChk').onchange = e => { S.taskbar = e.target.checked; api.setTaskbar(e.target.checked); $('#escText').textContent = e.target.checked ? 'Minimize to taskbar (keeps running)' : 'Hide to tray (keeps running)'; };
 $('#startup').onchange = async e => { try { e.target.checked = await api.setStartup(e.target.checked); } catch (err) { toast('Could not change startup setting'); } };
 window.quitApp = async () => { await flushSave(); api.quit(); };
 $('#quit').onclick = window.quitApp;
@@ -681,7 +684,7 @@ document.addEventListener('contextmenu', e => { if (!ed.contains(e.target) && !e
 (async () => {
   S = (await api.init()) || { notes: [] };
   notes = S.notes || [];
-  $('#startup').checked = !!S.startup; $('#ontopChk').checked = !!S.onTop;
+  $('#startup').checked = !!S.startup; $('#taskbarChk').checked = !!S.taskbar; $('#escText').textContent = S.taskbar ? 'Minimize to taskbar (keeps running)' : 'Hide to tray (keeps running)'; $('#ontopChk').checked = !!S.onTop;
   if (S.clientId) $('#cid').value = S.clientId;
   app.classList.toggle('side-open', S.sidebarOpen !== false);
   layout(); driveUI(); onStatus(S.status || 'local');

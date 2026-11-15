@@ -20,7 +20,8 @@ type Config struct {
 	LegacyToken  *oauth2.Token `json:"token,omitempty"`        // read once, then sealed
 	Email        string        `json:"email,omitempty"`
 	OnTop        bool          `json:"onTop"`
-	Rect         [4]int32      `json:"rect"` // x, y, w, h
+	Taskbar      bool          `json:"taskbar"` // show a taskbar button (default: tray only)
+	Rect         [4]int32      `json:"rect"`    // x, y, w, h
 	SidebarOpen  *bool         `json:"sidebarOpen,omitempty"`
 	LastNote     string        `json:"lastNote,omitempty"`
 
