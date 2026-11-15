@@ -38,9 +38,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
         run: |
+          NOTES="Download **DriveNotes.zip**, unzip, and run DriveNotes.exe (Windows 10/11, 64-bit). Built by GitHub Actions from commit $GITHUB_SHA. SHA-256 checksums are in SHA256SUMS.txt."
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && gh release view "$TAG" >/dev/null 2>&1; then
+            # Manual run for an existing version: rebuild it from the current code.
+            gh release delete "$TAG" --cleanup-tag --yes
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" DriveNotes.zip SHA256SUMS.txt --clobber
           else
-            gh release create "$TAG" DriveNotes.zip SHA256SUMS.txt --title "DriveNotes $TAG" --target "$GITHUB_SHA" \
-              --notes "Download **DriveNotes.zip**, unzip, and run DriveNotes.exe (Windows 10/11, 64-bit). Built by GitHub Actions from commit $GITHUB_SHA. SHA-256 checksums are in SHA256SUMS.txt."
+            gh release create "$TAG" DriveNotes.zip SHA256SUMS.txt --title "DriveNotes $TAG" --target "$GITHUB_SHA" --notes "$NOTES"
           fi

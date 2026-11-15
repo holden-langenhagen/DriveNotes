@@ -64,7 +64,7 @@ GOOS=windows GOARCH=amd64 go build -trimpath -ldflags "-s -w -H windowsgui" -o D
 * `-H windowsgui` stops a console window from opening; `-trimpath -s -w` keeps the exe small and free of your local paths.
 * Run the tests with `go test .`.
 
-**Official builds** are made by GitHub Actions from this exact source ([workflow](.github/workflows/release.yml)): pushing a tag like `v1.5.2` builds the exe, runs the tests and attaches `DriveNotes.zip` to a release. You can also run it by hand from the **Actions** tab (**Build & release → Run workflow**).
+**Official builds** are made by GitHub Actions from this exact source ([workflow](.github/workflows/release.yml)): pushing a tag like `v1.5.2` builds the exe, runs the tests and attaches `DriveNotes.zip` to a release. You can also run it by hand from the **Actions** tab (**Build & release → Run workflow**); entering an existing version rebuilds that release from the current code.
 
 ## Privacy & security
 * **No secrets in this repo or the exe.** Each user creates their own Google OAuth client; its ID/secret are entered in the app and never compiled in.
